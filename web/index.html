@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BIM2Struct Digital Twin</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace">
+        <aside class="sidebar" aria-label="Project controls">
+          <div class="brand">
+            <span class="mark">B2S</span>
+            <div>
+              <h1>BIM2Struct</h1>
+              <p>Lifecycle-aware structural digital twin</p>
+            </div>
+          </div>
+
+          <label class="file-drop" for="ifcFile">
+            <input id="ifcFile" type="file" accept=".ifc,.txt" />
+            <span class="file-icon">IFC</span>
+            <span class="file-title">Select IFC model</span>
+            <span id="fileName" class="file-name">No file loaded</span>
+          </label>
+
+          <div class="backend-card">
+            <span>Backend</span>
+            <strong id="backendState">Checking...</strong>
+          </div>
+        </aside>
+
+        <section class="main-panel">
+          <header class="topbar">
+            <div>
+              <p class="eyebrow">IFC to analysis-ready model</p>
+              <h2 id="projectTitle">Awaiting model</h2>
+            </div>
+            <div id="statusBadge" class="status-badge">Idle</div>
+          </header>
+
+          <section class="metric-grid" aria-label="IFC model statistics">
+            <article class="metric">
+              <span>Raw IFC storeys</span>
+              <strong id="storeyCount">-</strong>
+            </article>
+            <article class="metric">
+              <span>Analysis levels</span>
+              <strong id="analysisLevelCount">-</strong>
+            </article>
+            <article class="metric">
+              <span>IFC grids</span>
+              <strong id="gridCount">-</strong>
+            </article>
+            <article class="metric">
+              <span>Raw columns</span>
+              <strong id="columnCount">-</strong>
+            </article>
+            <article class="metric">
+              <span>Raw beams</span>
+              <strong id="beamCount">-</strong>
+            </article>
+            <article class="metric">
+              <span>Raw walls</span>
+              <strong id="wallCount">-</strong>
+            </article>
+          </section>
+
+          <section class="analysis-layout">
+            <article class="viewport-panel">
+              <div class="panel-heading">
+                <h3>Analysis Model Preview</h3>
+                <div class="view-tools">
+                  <span id="topologyTag">Backend required</span>
+                  <button id="resetView" class="icon-button" type="button" title="Reset 3D view">Reset</button>
+                  <button id="downloadTables" class="icon-button" type="button" title="Download structural tables" disabled>Download</button>
+                </div>
+              </div>
+              <canvas id="modelCanvas" width="900" height="520"></canvas>
+            </article>
+
+            <article class="result-panel">
+              <div class="tabs" role="tablist" aria-label="Results">
+                <button class="tab active" data-tab="summary" type="button">Summary</button>
+                <button class="tab" data-tab="gravity" type="button">Gravity</button>
+                <button class="tab" data-tab="modal" type="button">Modal</button>
+                <button class="tab" data-tab="seismic" type="button">Seismic</button>
+                <button class="tab" data-tab="reliability" type="button">Reliability</button>
+              </div>
+
+              <div id="summaryTab" class="tab-page active">
+                <dl class="summary-list">
+                  <div>
+                    <dt>Backend connection</dt>
+                    <dd id="backendSummary">Checking...</dd>
+                  </div>
+                  <div>
+                    <dt>BIM2Struct nodes</dt>
+                    <dd id="processedNodes">Backend pending</dd>
+                  </div>
+                  <div>
+                    <dt>BIM2Struct columns</dt>
+                    <dd id="processedColumns">Backend pending</dd>
+                  </div>
+                  <div>
+                    <dt>BIM2Struct beams</dt>
+                    <dd id="processedBeams">Backend pending</dd>
+                  </div>
+                  <div>
+                    <dt>BIM2Struct walls</dt>
+                    <dd id="processedWalls">Backend pending</dd>
+                  </div>
+                  <div>
+                    <dt>Skipped members</dt>
+                    <dd id="skippedMembers">Backend pending</dd>
+                  </div>
+                  <div>
+                    <dt>Property sets</dt>
+                    <dd id="psetCount">-</dd>
+                  </div>
+                  <div>
+                    <dt>Material records</dt>
+                    <dd id="materialCount">-</dd>
+                  </div>
+                  <div>
+                    <dt>Analysis state</dt>
+                    <dd id="analysisState">Waiting for IFC input</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div id="gravityTab" class="tab-page">
+                <div class="gravity-controls">
+                  <div class="control-group compact">
+                    <label for="loadCase">Load case / combination</label>
+                    <select id="loadCase">
+                      <option value="service_gravity">Service gravity: 1.0D + 1.0L</option>
+                      <option value="uls_gravity">ULS gravity: 1.35D + 1.5L</option>
+                    </select>
+                  </div>
+                  <div class="control-group compact">
+                    <label for="deadLoad">Dead load, qD (kN/m2)</label>
+                    <input id="deadLoad" type="number" min="0" step="0.1" value="5.0" />
+                  </div>
+                  <div class="control-group compact">
+                    <label for="liveLoad">Live load, qL (kN/m2)</label>
+                    <input id="liveLoad" type="number" min="0" step="0.1" value="2.5" />
+                  </div>
+                  <div class="control-group compact">
+                    <label for="psiLoad">Mass factor, psi</label>
+                    <input id="psiLoad" type="number" min="0" max="1" step="0.05" value="0.30" />
+                  </div>
+                  <button id="runGravity" class="primary-button compact-button" type="button">Run gravity</button>
+                </div>
+                <div class="model-options">
+                  <label class="check-row">
+                    <input id="expansionJointSprings" type="checkbox" checked />
+                    <span>Expansion joint boundary springs</span>
+                  </label>
+                  <div class="control-group compact">
+                    <label for="expansionJointStiffness">X spring stiffness per side per floor (N/mm)</label>
+                    <input id="expansionJointStiffness" type="number" min="0" step="100" value="9000" />
+                  </div>
+                </div>
+                <div class="demand-controls">
+                  <div class="control-group compact">
+                    <label for="gravityDemandMetric">Gravity demand visualization</label>
+                    <select id="gravityDemandMetric">
+                      <option value="none">None</option>
+                      <option value="axial">Axial force</option>
+                      <option value="moment">Bending moment</option>
+                      <option value="shear">Shear force</option>
+                      <option value="dcr">Demand-capacity ratio</option>
+                    </select>
+                  </div>
+                  <div class="demand-legend">
+                    <span>Low</span>
+                    <i></i>
+                    <span>High</span>
+                  </div>
+                </div>
+                <p id="gravityMethod" class="method-note">Load an IFC model to run gravity analysis.</p>
+                <dl class="summary-list">
+                  <div>
+                    <dt>Status</dt>
+                    <dd id="gravityStatus">Backend pending</dd>
+                  </div>
+                  <div>
+                    <dt>Load combination</dt>
+                    <dd id="loadCaseState">-</dd>
+                  </div>
+                  <div>
+                    <dt>Floor area</dt>
+                    <dd id="gravityArea">-</dd>
+                  </div>
+                  <div>
+                    <dt>Gravity load / floor</dt>
+                    <dd id="gravityFloorLoad">-</dd>
+                  </div>
+                  <div>
+                    <dt>Total gravity load</dt>
+                    <dd id="gravityTotalLoad">-</dd>
+                  </div>
+                  <div>
+                    <dt>Seismic weight / floor</dt>
+                    <dd id="gravitySeismicWeight">-</dd>
+                  </div>
+                  <div>
+                    <dt>Max vertical displacement</dt>
+                    <dd id="gravityMaxUz">-</dd>
+                  </div>
+                  <div>
+                    <dt>Max horizontal displacement</dt>
+                    <dd id="gravityMaxUh">-</dd>
+                  </div>
+                  <div>
+                    <dt>Expansion joint springs</dt>
+                    <dd id="expansionJointState">-</dd>
+                  </div>
+                  <div>
+                    <dt>Demand display</dt>
+                    <dd id="gravityDemandState">-</dd>
+                  </div>
+                  <div>
+                    <dt>Max DCR</dt>
+                    <dd id="gravityDcrState">-</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div id="modalTab" class="tab-page">
+                <div class="modal-controls">
+                  <div class="control-group compact">
+                    <label for="modeScale">Mode shape scale</label>
+                    <div class="range-row">
+                      <input id="modeScale" type="range" min="0" max="0.30" step="0.01" value="0.12" />
+                      <strong id="modeScaleValue">0.12</strong>
+                    </div>
+                  </div>
+                  <div class="segmented-control" aria-label="Mode shape display">
+                    <label>
+                      <input type="radio" name="modeDisplay" value="undeformed" />
+                      <span>Undeformed</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="modeDisplay" value="deformed" checked />
+                      <span>Deformed</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="modeDisplay" value="overlay" />
+                      <span>Overlay</span>
+                    </label>
+                  </div>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Mode</th>
+                      <th>Frequency</th>
+                      <th>Period</th>
+                      <th>Direction</th>
+                    </tr>
+                  </thead>
+                  <tbody id="modalRows">
+                    <tr>
+                      <td colspan="4">Connect OpenSees backend to populate modal results.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div id="seismicTab" class="tab-page">
+                <label class="file-drop compact-drop" for="groundMotionFile">
+                  <input id="groundMotionFile" type="file" accept=".txt,.dat,.csv,.AT2" />
+                  <span class="file-icon">GM</span>
+                  <span class="file-title">Select ground motion</span>
+                  <span id="groundMotionName" class="file-name">No record loaded</span>
+                </label>
+                <div class="seismic-controls">
+                  <div class="control-group compact">
+                    <label for="targetPga">Target PGA (g)</label>
+                    <input id="targetPga" type="number" min="0" step="0.05" value="0.20" />
+                  </div>
+                  <div class="control-group compact">
+                    <label for="direction">Earthquake direction</label>
+                    <select id="direction">
+                      <option value="X">X direction</option>
+                      <option value="Y">Y direction</option>
+                    </select>
+                  </div>
+                  <div class="control-group compact">
+                    <label for="damping">Damping ratio</label>
+                    <input id="damping" type="number" min="0" max="0.2" step="0.01" value="0.05" />
+                  </div>
+                  <div class="control-group compact">
+                    <label for="groundMotionDt">Ground motion dt (s)</label>
+                    <input id="groundMotionDt" type="number" min="0.0001" step="0.001" value="0.01" />
+                  </div>
+                  <div class="control-group compact">
+                    <label for="analysisDt">Analysis dt (s)</label>
+                    <input id="analysisDt" type="number" min="0.0001" step="0.001" placeholder="Use ground motion dt" />
+                  </div>
+                  <div class="control-group compact">
+                    <label for="accelerationUnit">Acceleration unit</label>
+                    <select id="accelerationUnit">
+                      <option value="g">g</option>
+                      <option value="mm/s2">mm/s2</option>
+                    </select>
+                  </div>
+                  <div class="control-group compact">
+                    <label for="collapseIdr">Collapse IDR threshold</label>
+                    <input id="collapseIdr" type="number" min="0" step="0.005" value="0.04" />
+                  </div>
+                  <div class="control-group compact">
+                    <label for="maxSubdivisions">Failure step subdivisions</label>
+                    <input id="maxSubdivisions" type="number" min="0" max="8" step="1" value="5" />
+                  </div>
+                  <button id="runSeismic" class="primary-button compact-button" type="button">Run seismic</button>
+                  <button id="runXYComparison" class="primary-button compact-button secondary-action" type="button">Run independent X/Y comparison</button>
+                  <button id="downloadSeismicReport" class="primary-button compact-button secondary-action" type="button" disabled>Download seismic report HTML</button>
+                </div>
+                <div class="job-status">
+                  <div>
+                    <span>Analysis status</span>
+                    <strong id="seismicJobStatus">Idle</strong>
+                  </div>
+                  <div class="progress-track">
+                    <i id="seismicProgress"></i>
+                  </div>
+                </div>
+                <p id="seismicMethod" class="method-note">Load an IFC model and ground motion record to run seismic response analysis.</p>
+                <div class="response-card">
+                  <span>Peak roof displacement</span>
+                  <strong id="roofDisp">-</strong>
+                </div>
+                <div class="response-card">
+                  <span>Peak inter-storey drift</span>
+                  <strong id="peakIdr">-</strong>
+                </div>
+                <div class="response-card">
+                  <span>Collapse check</span>
+                  <strong id="collapseCheck">-</strong>
+                </div>
+                <div class="response-card">
+                  <span>Critical story</span>
+                  <strong id="criticalStory">-</strong>
+                </div>
+                <div class="response-card">
+                  <span>Solver diagnostics</span>
+                  <strong id="solverDiagnostics">-</strong>
+                </div>
+                <div class="response-card">
+                  <span>Independent X/Y comparison</span>
+                  <strong id="xyComparisonSummary">Not run</strong>
+                </div>
+                <div id="xyComparisonChart" class="mini-chart comparison-chart"></div>
+                <div class="animation-controls">
+                  <button id="toggleAnimation" class="primary-button compact-button" type="button" disabled>Play animation</button>
+                  <div class="control-group compact">
+                    <label for="animationTime">Animation time</label>
+                    <div class="range-row">
+                      <input id="animationTime" type="range" min="0" max="0" step="1" value="0" disabled />
+                      <strong id="animationTimeValue">-</strong>
+                    </div>
+                  </div>
+                  <div class="control-group compact">
+                    <label for="animationScale">Animation scale</label>
+                    <div class="range-row">
+                      <input id="animationScale" type="range" min="1" max="80" step="1" value="20" disabled />
+                      <strong id="animationScaleValue">20x</strong>
+                    </div>
+                  </div>
+                  <div class="response-card compact-response">
+                    <span>Current frame response</span>
+                    <strong id="animationFrameResponse">-</strong>
+                  </div>
+                </div>
+                <div class="chart-grid">
+                  <div>
+                    <h4>Roof displacement</h4>
+                    <div id="roofDispChart" class="mini-chart"></div>
+                  </div>
+                  <div>
+                    <h4>Max IDR</h4>
+                    <div id="maxIdrChart" class="mini-chart"></div>
+                  </div>
+                  <div>
+                    <h4>Story IDR histories</h4>
+                    <div id="storyIdrChart" class="mini-chart story-chart"></div>
+                  </div>
+                  <div>
+                    <h4>Peak IDR profile</h4>
+                    <div id="peakIdrProfileChart" class="mini-chart"></div>
+                  </div>
+                  <div>
+                    <h4>Peak displacement profile</h4>
+                    <div id="peakDispProfileChart" class="mini-chart"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="reliabilityTab" class="tab-page">
+                <label class="file-drop compact-drop" for="reliabilityGroundMotions">
+                  <input id="reliabilityGroundMotions" type="file" accept=".txt,.dat,.csv,.AT2" multiple />
+                  <span class="file-icon">GM</span>
+                  <span class="file-title">Select ground-motion set</span>
+                  <span id="reliabilityGroundMotionName" class="file-name">No records loaded</span>
+                </label>
+                <div class="reliability-controls">
+                  <div class="control-group compact">
+                    <label for="reliabilityPgaLevels">PGA levels (g)</label>
+                    <input id="reliabilityPgaLevels" type="text" value="0.05, 0.10, 0.15, 0.20, 0.30" />
+                  </div>
+                  <div class="control-group compact">
+                    <label for="reliabilityIdrLimits">IDR limits (%)</label>
+                    <input id="reliabilityIdrLimits" type="text" value="1, 2, 4" />
+                  </div>
+                  <div class="control-group compact">
+                    <label for="reliabilityTargetPga">Report target PGA (g)</label>
+                    <input id="reliabilityTargetPga" type="number" min="0" step="0.01" value="0.20" />
+                  </div>
+                  <div class="control-group compact">
+                    <label for="reliabilityDirection">Direction</label>
+                    <select id="reliabilityDirection">
+                      <option value="X">X direction</option>
+                      <option value="Y">Y direction</option>
+                    </select>
+                  </div>
+                  <button id="runReliability" class="primary-button compact-button" type="button">Run reliability</button>
+                </div>
+                <div class="job-status">
+                  <div>
+                    <span>Reliability status</span>
+                    <strong id="reliabilityStatus">Idle</strong>
+                  </div>
+                  <div class="progress-track">
+                    <i id="reliabilityProgress"></i>
+                  </div>
+                </div>
+                <p id="reliabilityMethod" class="method-note">Run a batch of independent nonlinear analyses over multiple ground motions and PGA levels to estimate empirical fragility points and reliability indices.</p>
+                <div class="response-card">
+                  <span>Batch size</span>
+                  <strong id="reliabilityBatchSize">-</strong>
+                </div>
+                <div class="response-card">
+                  <span>Target PGA reliability</span>
+                  <strong id="reliabilityTargetSummary">-</strong>
+                </div>
+                <div class="chart-grid">
+                  <div>
+                    <h4>Fragility curves</h4>
+                    <div id="fragilityChart" class="mini-chart story-chart"></div>
+                  </div>
+                  <div>
+                    <h4>Reliability matrix</h4>
+                    <div id="reliabilityMatrix" class="table-box"></div>
+                  </div>
+                  <div>
+                    <h4>Batch runs</h4>
+                    <div id="reliabilityRuns" class="table-box"></div>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
