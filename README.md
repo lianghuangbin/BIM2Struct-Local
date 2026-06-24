@@ -1,6 +1,6 @@
 # BIM2Struct Web Prototype
 
-This repository contains a local web prototype for the BIM2Struct workflow.
+This repository contains a local web prototype for the BIM2Struct workflow, which is for demonstration/review purposes only. Modifications or redistribution without permission are strictly prohibited.
 
 The current version supports:
 
@@ -126,3 +126,5 @@ For each PGA level and each IDR limit, the web page computes the empirical excee
 ```text
 Pf(IM, IDR_limit) = N(peak_IDR > IDR_limit) / N(total completed records)
 ```
+
+
